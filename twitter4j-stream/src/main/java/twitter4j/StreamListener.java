@@ -20,7 +20,7 @@ package twitter4j;
  * @author Yusuke Yamamoto - yusuke at mac.com
  * @since Twitter4J 2.1.8
  */
-interface StreamListener {
+public interface StreamListener {
     void onEvent(String line);
     void onException(Exception ex);
 }
