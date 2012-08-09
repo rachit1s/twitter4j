@@ -65,20 +65,29 @@ class TwitterStreamImpl extends TwitterBaseImpl implements TwitterStream {
     public void firehose(final int count) {
         ensureAuthorizationEnabled();
         ensureListenerIsSet();
-        ensureStatusStreamListenerIsSet();
         startHandler(new TwitterStreamConsumer() {
-            public StatusStream getStream() throws TwitterException {
-                return getFirehoseStream(count);
+            public StreamImplementation getStream() throws TwitterException {
+                return getJSONStream("statuses/firehose.json", count);
             }
         });
     }
-
-    /**
+    
+    public void jsonStream(final String relUrl, final int count) {
+        ensureAuthorizationEnabled();
+        ensureListenerIsSet();
+        startHandler(new TwitterStreamConsumer() {
+            public StreamImplementation getStream() throws TwitterException {
+                return getJSONStream(relUrl, count);
+            }
+        });
+    }
+    
+        /**
      * {@inheritDoc}
      */
-    public StatusStream getFirehoseStream(int count) throws TwitterException {
+    public JSONStream getJSONStream(String relUrl, int count) throws TwitterException {
         ensureAuthorizationEnabled();
-        return getCountStream("statuses/firehose.json", count);
+        return getCountStream(relUrl, count);
     }
 
     /**
@@ -87,9 +96,8 @@ class TwitterStreamImpl extends TwitterBaseImpl implements TwitterStream {
     public void links(final int count) {
         ensureAuthorizationEnabled();
         ensureListenerIsSet();
-        ensureStatusStreamListenerIsSet();
         startHandler(new TwitterStreamConsumer() {
-            public StatusStream getStream() throws TwitterException {
+            public StreamImplementation getStream() throws TwitterException {
                 return getLinksStream(count);
             }
         });
@@ -98,15 +106,15 @@ class TwitterStreamImpl extends TwitterBaseImpl implements TwitterStream {
     /**
      * {@inheritDoc}
      */
-    public StatusStream getLinksStream(int count) throws TwitterException {
+    public JSONStream getLinksStream(int count) throws TwitterException {
         ensureAuthorizationEnabled();
         return getCountStream("statuses/links.json", count);
     }
 
-    private StatusStream getCountStream(String relativeUrl, int count) throws TwitterException {
+    private JSONStream getCountStream(String relativeUrl, int count) throws TwitterException {
         ensureAuthorizationEnabled();
         try {
-            return new StatusStreamImpl(getDispatcher(), http.post(conf.getStreamBaseURL() + relativeUrl
+            return new JSONStream(getDispatcher(), http.post(conf.getStreamBaseURL() + relativeUrl
                     , new HttpParameter[]{new HttpParameter("count", String.valueOf(count))}, auth), conf);
         } catch (IOException e) {
             throw new TwitterException(e);
@@ -116,131 +124,7 @@ class TwitterStreamImpl extends TwitterBaseImpl implements TwitterStream {
     /**
      * {@inheritDoc}
      */
-    public void retweet() {
-        ensureAuthorizationEnabled();
-        ensureListenerIsSet();
-        ensureStatusStreamListenerIsSet();
-        startHandler(new TwitterStreamConsumer() {
-            public StatusStream getStream() throws TwitterException {
-                return getRetweetStream();
-            }
-        });
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public StatusStream getRetweetStream() throws TwitterException {
-        ensureAuthorizationEnabled();
-        try {
-            return new StatusStreamImpl(getDispatcher(), http.post(conf.getStreamBaseURL() + "statuses/retweet.json"
-                    , new HttpParameter[]{}, auth), conf);
-        } catch (IOException e) {
-            throw new TwitterException(e);
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void sample() {
-        ensureAuthorizationEnabled();
-        ensureListenerIsSet();
-        ensureStatusStreamListenerIsSet();
-        startHandler(new TwitterStreamConsumer() {
-            public StatusStream getStream() throws TwitterException {
-                return getSampleStream();
-            }
-        });
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public StatusStream getSampleStream() throws TwitterException {
-        ensureAuthorizationEnabled();
-        try {
-            return new StatusStreamImpl(getDispatcher(), http.get(conf.getStreamBaseURL() + "statuses/sample.json"
-                    , auth), conf);
-        } catch (IOException e) {
-            throw new TwitterException(e);
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void user() {
-        user(null);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void user(final String[] track) {
-        ensureAuthorizationEnabled();
-        ensureListenerIsSet();
-        for (StreamListener listener : streamListeners) {
-            if (!(listener instanceof UserStreamListener)) {
-                throw new IllegalStateException("Only UserStreamListener is supported. found: " + listener.getClass());
-            }
-        }
-        startHandler(new TwitterStreamConsumer() {
-            public UserStream getStream() throws TwitterException {
-                return getUserStream(track);
-            }
-        });
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public UserStream getUserStream() throws TwitterException {
-        return getUserStream(null);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public UserStream getUserStream(String[] track) throws TwitterException {
-        ensureAuthorizationEnabled();
-        try {
-            List<HttpParameter> params = new ArrayList<HttpParameter>();
-            if (conf.isUserStreamRepliesAllEnabled()) {
-                params.add(new HttpParameter("replies", "all"));
-            }
-            if (track != null) {
-                params.add(new HttpParameter("track", z_T4JInternalStringUtil.join(track)));
-            }
-            return new UserStreamImpl(getDispatcher(), http.post(conf.getUserStreamBaseURL() + "user.json"
-                    , params.toArray(new HttpParameter[params.size()])
-                    , auth), conf);
-        } catch (IOException e) {
-            throw new TwitterException(e);
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void site(final boolean withFollowings, final long[] follow) {
-        ensureOAuthEnabled();
-        ensureListenerIsSet();
-        for (StreamListener listener : streamListeners) {
-            if (!(listener instanceof SiteStreamsListener)) {
-                throw new IllegalStateException("Only SiteStreamListener is supported. found: " + listener.getClass());
-            }
-        }
-        startHandler(new TwitterStreamConsumer() {
-            public StreamImplementation getStream() throws TwitterException {
-                try {
-                    return new SiteStreamsImpl(getDispatcher(), getSiteStream(withFollowings, follow), conf);
-                } catch (IOException e) {
-                    throw new TwitterException(e);
-                }
-            }
-        });
-    }
+   
 
     private Dispatcher getDispatcher() {
         if (null == TwitterStreamImpl.dispatcher) {
@@ -258,44 +142,6 @@ class TwitterStreamImpl extends TwitterBaseImpl implements TwitterStream {
 
     private static transient Dispatcher dispatcher;
 
-    InputStream getSiteStream(boolean withFollowings, long[] follow) throws TwitterException {
-        ensureOAuthEnabled();
-        return http.post(conf.getSiteStreamBaseURL() + "site.json",
-                new HttpParameter[]{
-                        new HttpParameter("with", withFollowings ? "followings" : "user")
-                        , new HttpParameter("follow", z_T4JInternalStringUtil.join(follow))}
-                , auth).asStream();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void filter(final FilterQuery query) {
-        ensureAuthorizationEnabled();
-        ensureListenerIsSet();
-        ensureStatusStreamListenerIsSet();
-        startHandler(new TwitterStreamConsumer() {
-            public StatusStream getStream() throws TwitterException {
-                return getFilterStream(query);
-            }
-        });
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public StatusStream getFilterStream(FilterQuery query) throws TwitterException {
-        ensureAuthorizationEnabled();
-        try {
-            return new StatusStreamImpl(getDispatcher(), http.post(conf.getStreamBaseURL()
-                    + "statuses/filter.json"
-                    , query.asHttpParameterArray(), auth), conf);
-        } catch (IOException e) {
-            throw new TwitterException(e);
-        }
-    }
-
-
     /**
      * check if any listener is set. Throws IllegalStateException if no listener is set.
      *
@@ -305,14 +151,6 @@ class TwitterStreamImpl extends TwitterBaseImpl implements TwitterStream {
     private void ensureListenerIsSet() {
         if (streamListeners.length == 0) {
             throw new IllegalStateException("No listener is set.");
-        }
-    }
-
-    private void ensureStatusStreamListenerIsSet() {
-        for (StreamListener listener : streamListeners) {
-            if (!(listener instanceof StatusListener)) {
-                throw new IllegalStateException("Only StatusListener is supported. found: " + listener.getClass());
-            }
         }
     }
 
@@ -361,28 +199,8 @@ class TwitterStreamImpl extends TwitterBaseImpl implements TwitterStream {
         this.lifeCycleListeners.add(listener);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void addListener(UserStreamListener listener) {
-        addListener((StreamListener) listener);
-    }
 
-    /**
-     * {@inheritDoc}
-     */
-    public void addListener(StatusListener listener) {
-        addListener((StreamListener) listener);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void addListener(SiteStreamsListener listener) {
-        addListener((StreamListener) listener);
-    }
-
-    private synchronized void addListener(StreamListener listener) {
+    public synchronized void addListener(StreamListener listener) {
         StreamListener[] newListeners = new StreamListener[this.streamListeners.length + 1];
         System.arraycopy(this.streamListeners, 0, newListeners, 0, this.streamListeners.length);
         newListeners[newListeners.length - 1] = listener;
@@ -404,6 +222,10 @@ class TwitterStreamImpl extends TwitterBaseImpl implements TwitterStream {
     private static final int NO_WAIT = 0;
 
     static int count = 0;
+
+    public void jsonStream(String url) {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
 
     abstract class TwitterStreamConsumer extends Thread {
         private StreamImplementation stream = null;

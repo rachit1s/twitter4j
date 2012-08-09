@@ -19,9 +19,6 @@ package twitter4j;
 import twitter4j.conf.Configuration;
 import twitter4j.internal.async.Dispatcher;
 import twitter4j.internal.http.HttpResponse;
-import twitter4j.internal.org.json.JSONException;
-import twitter4j.internal.org.json.JSONObject;
-import twitter4j.internal.util.z_T4JInternalParseUtil;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,15 +29,15 @@ import java.io.InputStream;
  * @author Yusuke Yamamoto - yusuke at mac.com
  * @since Twitter4J 2.1.2
  */
-class StatusStreamImpl extends AbstractStreamImplementation implements StatusStream {
+public class JSONStream extends AbstractStreamImplementation {
     /*package*/
 
-    StatusStreamImpl(Dispatcher dispatcher, InputStream stream, Configuration conf) throws IOException {
+    JSONStream(Dispatcher dispatcher, InputStream stream, Configuration conf) throws IOException {
         super(dispatcher, stream, conf);
     }
     /*package*/
 
-    StatusStreamImpl(Dispatcher dispatcher, HttpResponse response, Configuration conf) throws IOException {
+    JSONStream(Dispatcher dispatcher, HttpResponse response, Configuration conf) throws IOException {
         super(dispatcher, response, conf);
     }
 
@@ -55,7 +52,7 @@ class StatusStreamImpl extends AbstractStreamImplementation implements StatusStr
      * @throws TwitterException      when the end of the stream has been reached.
      * @throws IllegalStateException when the end of the stream had been reached.
      */
-    public void next(StatusListener listener) throws TwitterException {
+    public void next(StreamListener listener) throws TwitterException {
         StreamListener[] list = new StreamListener[1];
         list[0] = listener;
         this.listeners = list;
@@ -73,41 +70,10 @@ class StatusStreamImpl extends AbstractStreamImplementation implements StatusStr
     }
 
     @Override
-    protected void onStatus(JSONObject json) throws TwitterException {
+    public void onEvent(String line) {
         for (StreamListener listener : listeners) {
-            ((StatusListener) listener).onStatus(asStatus(json));
+            listener.onEvent(line);
         }
-    }
-
-    @Override
-    protected void onDelete(JSONObject json) throws TwitterException, JSONException {
-        for (StreamListener listener : listeners) {
-            JSONObject deletionNotice = json.getJSONObject("delete");
-            if (deletionNotice.has("status")) {
-                ((StatusListener) listener).onDeletionNotice(new StatusDeletionNoticeImpl(deletionNotice.getJSONObject("status")));
-            } else {
-                JSONObject directMessage = deletionNotice.getJSONObject("direct_message");
-                ((UserStreamListener) listener).onDeletionNotice(z_T4JInternalParseUtil.getLong("id", directMessage)
-                        , z_T4JInternalParseUtil.getLong("user_id", directMessage));
-            }
-        }
-    }
-
-    @Override
-    protected void onLimit(JSONObject json) throws TwitterException, JSONException {
-        for (StreamListener listener : listeners) {
-            ((StatusListener) listener).onTrackLimitationNotice(z_T4JInternalParseUtil.getInt("track", json.getJSONObject("limit")));
-        }
-    }
-
-    @Override
-    protected void onScrubGeo(JSONObject json) throws TwitterException, JSONException {
-        JSONObject scrubGeo = json.getJSONObject("scrub_geo");
-        for (StreamListener listener : listeners) {
-            ((StatusListener) listener).onScrubGeo(z_T4JInternalParseUtil.getLong("user_id", scrubGeo)
-                    , z_T4JInternalParseUtil.getLong("up_to_status_id", scrubGeo));
-        }
-
     }
 
     @Override
